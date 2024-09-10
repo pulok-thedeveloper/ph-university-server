@@ -3,7 +3,7 @@ import {
   TGuardian,
   TLocalGuardian,
   TStudent,
-  StudentMethods,
+  // StudentMethods,
   StudentModel,
   TUserName,
 } from "./student.interface";
@@ -75,64 +75,98 @@ const localGuardianSchema = new Schema<TLocalGuardian>({
   },
 });
 
-const studentSchema = new Schema<TStudent, StudentModel, StudentMethods>({
-  id: { type: String, required: true, unique: true },
-  name: { type: userNameSchema, required: [true, "name is required"] },
-  gender: {
-    type: String,
-    enum: {
-      values: ["male", "female", "other"],
-      message: "{VALUE} is not valid",
+const studentSchema = new Schema<TStudent, StudentModel>(
+  {
+    id: { type: String, required: true, unique: true },
+    user: {
+      type: Schema.Types.ObjectId,
+      required: [true, "User ID is required"],
+      unique: true,
+      ref: 'User'
     },
-    required: [true, "gender is required"],
-  },
-  dateOfBirth: { type: String },
-  email: {
-    type: String,
-    required: [true, "email is required"],
-    unique: true,
-    validate: {
-      validator: function (value: string) {
-        return validator.isEmail(value);
+    name: {
+      type: userNameSchema,
+      required: [true, "name is required"],
+      maxlength: [20, "Password can not be more than 20"],
+    },
+    gender: {
+      type: String,
+      enum: {
+        values: ["male", "female", "other"],
+        message: "{VALUE} is not valid",
       },
-      message: "{VALUE is not valid email type.}",
+      required: [true, "gender is required"],
     },
-  },
-  contactNo: { type: String, required: [true, "contactNo is required"] },
-  emergencyContactNo: {
-    type: String,
-    required: [true, "emergencyContactNo is required"],
-  },
-  bloodGroup: {
-    type: String,
-    enum: {
-      values: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
-      message: "{VALUE} is not valid",
+    dateOfBirth: { type: String },
+    email: {
+      type: String,
+      required: [true, "email is required"],
+      unique: true,
+      validate: {
+        validator: function (value: string) {
+          return validator.isEmail(value);
+        },
+        message: "{VALUE is not valid email type.}",
+      },
     },
+    contactNo: { type: String, required: [true, "contactNo is required"] },
+    emergencyContactNo: {
+      type: String,
+      required: [true, "emergencyContactNo is required"],
+    },
+    bloodGroup: {
+      type: String,
+      enum: {
+        values: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+        message: "{VALUE} is not valid",
+      },
+    },
+    presentAddress: {
+      type: String,
+      required: [true, "presentAddress is required"],
+    },
+    permanentAddress: {
+      type: String,
+      required: [true, "permanentAddress is required"],
+    },
+    guardian: { type: guardianSchema, required: [true, "is required"] },
+    localGuardian: {
+      type: localGuardianSchema,
+      required: [true, "localGuardian is required"],
+    },
+    profileImg: { type: String },
+    isDeleted: { type: Boolean, default: false },
   },
-  presentAddress: {
-    type: String,
-    required: [true, "presentAddress is required"],
-  },
-  permanentAddress: {
-    type: String,
-    required: [true, "permanentAddress is required"],
-  },
-  guardian: { type: guardianSchema, required: [true, "is required"] },
-  localGuardian: {
-    type: localGuardianSchema,
-    required: [true, "localGuardian is required"],
-  },
-  profileImg: { type: String },
-  isActive: {
-    type: String,
-    enum: ["active", "blocked"],
-    required: [true, "is required"],
-    default: "active",
-  },
+  {
+    toJSON: {
+      virtuals: true,
+    },
+  }
+);
+
+//virtual
+studentSchema.virtual("fullName").get(function () {
+  return `${this.name.firstName} ${this.name.middleName} ${this.name.lastName}`;
 });
 
-studentSchema.methods.isUserExist = async function (id: string) {
+// Query middleware
+
+studentSchema.pre("find", function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+studentSchema.pre("findOne", function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+studentSchema.pre("aggregate", function (next) {
+  this.pipeline().unshift({ $match: { isDeleted: { $ne: true } } });
+  console.log(this.pipeline());
+  next();
+});
+
+// Creating a custom static method
+studentSchema.statics.isUserExist = async function (id: string) {
   const existingUser = await Student.findOne({ id });
   return existingUser;
 };
